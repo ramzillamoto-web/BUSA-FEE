@@ -1,0 +1,6 @@
+{
+  "name": "Maya Payment Schedule & Tracker",
+  "description": "Official 6-month payment schedule tracker for Ramazan Delos Santos and Sarah Martin with secure admin verification, reference logs, and Maya account tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
