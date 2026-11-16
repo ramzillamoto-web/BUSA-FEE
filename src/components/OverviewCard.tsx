@@ -39,7 +39,7 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({
         <div className="bg-emerald-50 border-b border-emerald-100 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2 text-emerald-800 font-semibold">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Admin Unlocked (Password: ramazan) · You can toggle paid months and edit reference logs.</span>
+            <span>Admin Unlocked (Password: ramazan) · All changes are saved globally and synced live to all devices.</span>
           </div>
           <button
             onClick={onLockAdmin}

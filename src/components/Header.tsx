@@ -1,11 +1,12 @@
 import React from 'react';
-import { Lock, Unlock, Printer, Share2 } from 'lucide-react';
+import { Lock, Unlock, Printer, Share2, Cloud } from 'lucide-react';
 
 interface HeaderProps {
   isAdmin: boolean;
   onAdminToggle: () => void;
   onPrint: () => void;
   onShare: () => void;
+  isCloudSynced?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -13,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAdminToggle,
   onPrint,
   onShare,
+  isCloudSynced = true,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 py-3 transition-colors">
@@ -23,9 +25,17 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-emerald-400">M</span>
           </div>
           <div>
-            <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight whitespace-nowrap">
-              Payment Schedule
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-tight whitespace-nowrap">
+                Payment Schedule
+              </h1>
+              {isCloudSynced && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                  <Cloud className="w-3 h-3 text-emerald-600" />
+                  <span>Global Sync</span>
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-slate-500 whitespace-nowrap hidden xs:block">
               Ramazan Delos Santos · Sarah Martin
             </p>

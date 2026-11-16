@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "Agreement": {
+      "title": "Agreement",
+      "description": "Payment schedule agreement details between payer and receiver",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "subtitle": { "type": "string", "maxLength": 100 },
+        "dateGenerated": { "type": "string", "maxLength": 50 },
+        "payer": { "type": "string", "maxLength": 100 },
+        "receiver": { "type": "string", "maxLength": 100 },
+        "receiverMayaNumber": { "type": "string", "maxLength": 30 },
+        "receiverMayaName": { "type": "string", "maxLength": 100 },
+        "monthlyPayment": { "type": "number" },
+        "duration": { "type": "string", "maxLength": 50 },
+        "totalAmount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "currencySymbol": { "type": "string", "maxLength": 10 },
+        "payerSigned": { "type": "boolean" },
+        "receiverSigned": { "type": "boolean" },
+        "payerSignDate": { "type": "string", "maxLength": 50 },
+        "receiverSignDate": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["title", "payer", "receiver", "monthlyPayment", "totalAmount"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Monthly installment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "monthNum": { "type": "string", "maxLength": 10 },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "dueDateISO": { "type": "string", "maxLength": 30 },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["Pending", "Paid"] },
+        "referenceNo": { "type": "string", "maxLength": 100 },
+        "paidAt": { "type": "string", "maxLength": 100 },
+        "notes": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["id", "monthNum", "dueDate", "amount", "method", "status"]
+    }
+  },
+  "firestore": {
+    "/agreements/{agreementId}": {
+      "schema": "Agreement",
+      "description": "Global agreement metadata and receiver Maya settings"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Global monthly installment status and reference codes"
+    }
+  }
+}

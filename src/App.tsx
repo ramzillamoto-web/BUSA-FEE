@@ -11,15 +11,21 @@ import { AdminPasswordModal } from './components/AdminPasswordModal';
 import { PaymentStatusModal } from './components/PaymentStatusModal';
 import { BottomNav, TabType } from './components/BottomNav';
 import { formatCurrency } from './utils/formatters';
-import { Filter, RotateCcw, CheckCircle, ShieldCheck, CheckCheck } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import {
+  subscribeToPayments,
+  subscribeToAgreement,
+  updatePaymentGlobal,
+  updateAgreementGlobal,
+  resetAllDataGlobal,
+} from './firebase';
+import { RotateCcw, CheckCircle, ShieldCheck } from 'lucide-react';
 
 const STORAGE_KEY_PAYMENTS = 'maya_payment_schedule_payments_v2';
 const STORAGE_KEY_META = 'maya_payment_schedule_meta_v2';
 const STORAGE_KEY_ADMIN = 'maya_payment_schedule_admin_v2';
 
 export default function App() {
-  // Load persisted state or initial seed
+  // Load persisted cache or initial seed for instant 0ms first render
   const [agreement, setAgreement] = useState<AgreementMeta>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_META);
@@ -46,6 +52,7 @@ export default function App() {
     }
   });
 
+  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<TabType>('schedule');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'paid'>('all');
 
@@ -67,7 +74,39 @@ export default function App() {
     }, 3000);
   };
 
-  // Sync with localStorage
+  // Real-time Firestore synchronization for payments and agreement
+  useEffect(() => {
+    const unsubPayments = subscribeToPayments(
+      (remotePayments) => {
+        if (remotePayments && remotePayments.length > 0) {
+          setPayments(remotePayments);
+          setIsCloudSynced(true);
+        }
+      },
+      (err) => {
+        console.warn('Real-time payment subscription error:', err);
+      }
+    );
+
+    const unsubAgreement = subscribeToAgreement(
+      (remoteAgreement) => {
+        if (remoteAgreement) {
+          setAgreement(remoteAgreement);
+          setIsCloudSynced(true);
+        }
+      },
+      (err) => {
+        console.warn('Real-time agreement subscription error:', err);
+      }
+    );
+
+    return () => {
+      unsubPayments();
+      unsubAgreement();
+    };
+  }, []);
+
+  // Sync cache with localStorage for offline resilience
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
@@ -128,7 +167,6 @@ export default function App() {
     if (!isAdmin) {
       const nextStatus = payment.status === 'Paid' ? 'Pending' : 'Paid';
       requestAdminAction(`Mark #${payment.monthNum} as ${nextStatus}`, () => {
-        // Open edit modal to capture reference and celebrate
         setSelectedPaymentForModal(payment);
         setStatusModalOpen(true);
       });
@@ -140,12 +178,20 @@ export default function App() {
     setStatusModalOpen(true);
   };
 
-  // Save updated payment from modal or reference log
-  const handleSavePayment = (updated: PaymentItem) => {
+  // Save updated payment from modal or reference log — saved globally to Firestore!
+  const handleSavePayment = async (updated: PaymentItem) => {
+    // 1. Optimistic instant local update
     setPayments((prev) =>
       prev.map((p) => (p.id === updated.id ? updated : p))
     );
-    showToast(`Payment #${updated.monthNum} updated`);
+    showToast(`Payment #${updated.monthNum} globally saved`);
+
+    // 2. Persist to Firestore database
+    try {
+      await updatePaymentGlobal(updated);
+    } catch (err) {
+      console.error('Failed to update payment globally:', err);
+    }
   };
 
   // Quick pay next pending
@@ -164,33 +210,45 @@ export default function App() {
     }
   };
 
-  // Update Maya Receiver Number
-  const handleUpdateMayaNumber = (newNumber: string) => {
-    setAgreement((prev) => ({
-      ...prev,
+  // Update Maya Receiver Number — saved globally to Firestore!
+  const handleUpdateMayaNumber = async (newNumber: string) => {
+    const updated = {
+      ...agreement,
       receiverMayaNumber: newNumber,
-    }));
-    showToast('Receiver Maya account number updated');
+    };
+    setAgreement(updated);
+    showToast('Receiver Maya account number globally saved');
+
+    try {
+      await updateAgreementGlobal(updated);
+    } catch (err) {
+      console.error('Failed to save Maya number globally:', err);
+    }
   };
 
-  // Reset to original PDF
-  const handleResetData = () => {
-    if (!isAdmin) {
-      requestAdminAction('Reset all schedule data', () => {
-        if (window.confirm('Reset all payments and references to initial PDF state?')) {
-          setPayments(INITIAL_PAYMENTS);
-          setAgreement(INITIAL_AGREEMENT);
-          showToast('Data reset to original agreement');
+  // Reset to original PDF globally
+  const handleResetData = async () => {
+    const executeReset = async () => {
+      if (window.confirm('Reset all payments and references to initial PDF state globally for all users?')) {
+        setPayments(INITIAL_PAYMENTS);
+        setAgreement(INITIAL_AGREEMENT);
+        showToast('Resetting global schedule...');
+        try {
+          await resetAllDataGlobal();
+          showToast('Data reset to original agreement globally');
+        } catch (err) {
+          console.error('Failed to reset global data:', err);
+          showToast('Data reset locally');
         }
-      });
+      }
+    };
+
+    if (!isAdmin) {
+      requestAdminAction('Reset all schedule data globally', executeReset);
       return;
     }
 
-    if (window.confirm('Reset all payments and references to initial PDF state?')) {
-      setPayments(INITIAL_PAYMENTS);
-      setAgreement(INITIAL_AGREEMENT);
-      showToast('Data reset to original agreement');
-    }
+    await executeReset();
   };
 
   // Print PDF
@@ -211,6 +269,7 @@ export default function App() {
       `Method: ${agreement.currency} ${agreement.currencySymbol} via Maya (${agreement.receiverMayaNumber})`,
       `Progress: ${paidList.length} of ${payments.length} Months Paid (${formatCurrency(totalPaid)} / ${formatCurrency(agreement.totalAmount)})`,
       nextPending ? `Next Due: #${nextPending.monthNum} on ${nextPending.dueDate} (${formatCurrency(nextPending.amount)})` : 'Status: All 6 installments fully settled!',
+      `Live Tracking: ${window.location.href}`,
     ].join('\n');
 
     navigator.clipboard.writeText(summaryText);
@@ -226,12 +285,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 sm:pb-12 selection:bg-emerald-500 selection:text-white">
-      {/* Top Header */}
+      {/* Top Header with live Global Sync badge */}
       <Header
         isAdmin={isAdmin}
         onAdminToggle={handleAdminToggle}
         onPrint={handlePrint}
         onShare={handleShare}
+        isCloudSynced={isCloudSynced}
       />
 
       {/* Main Content Area */}
@@ -295,7 +355,7 @@ export default function App() {
               className="text-xs font-medium text-slate-500 hover:text-rose-600 flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Data</span>
+              <span>Reset Data Globally</span>
             </button>
           )}
         </div>
